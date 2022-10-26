@@ -18,16 +18,19 @@ int main()
 
     int pos3 = TailInsert(&list, 20);
 
+    ListGraphDump(&list);
+
     int pos4 = InsertAfterIndex(&list, 40, pos2);
 
     int pos5 = InsertBeforeIndex(&list, 80, pos2);
 
     DeleteElement(&list, pos2);
 
-    ListExterminatus(&list);
+    ListSortByLogicIndex(&list);
 
-    for (int i = 1; i < 35; i++)
-        TailInsert(&list, i);
+    TailInsert(&list, 35);
+
+    ListExterminatus(&list);
 
 //    printf("elem5 = %d\n", list.data[pos5]);
 

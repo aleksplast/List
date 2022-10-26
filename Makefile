@@ -6,7 +6,3 @@ DIR := C:\Users\USER\Documents\List
 
 main: $(SRC)
 	$(CC) $^ -o $(DIR)\$@
-
-
-
-

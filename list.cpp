@@ -5,11 +5,13 @@
 
 #include "list.h"
 
-#define LISTCHECK int errors = ListVerr(list);                                          \
+#define LISTCHECK int errors = ListVerr(list);                                                      \
                     DBG ListTextDump(list, errors, __LINE__, __func__, __FILE__);
 
-#define SIZECHECK   if (list->size == list->capacity - 1)                               \
-                        ListEnlarge(list, ENLARGE);
+#define SIZECHECK   if (list->size == list->capacity - 1)                                           \
+                        ListResize(list, ENLARGE);                                                  \
+                    else if (list->size < list->capacity * SHRINKCOEFF && list->status == SORTED)   \
+                        ListResize(list, SHRINK);
 
 int ListCtor(struct List* list, size_t capacity)
 {
@@ -18,7 +20,7 @@ int ListCtor(struct List* list, size_t capacity)
     if ((list->data = (struct ElemList*) calloc(capacity + 1, sizeof(struct ElemList))) == NULL)
         return MEMERR;
 
-    list->data[0].elem = 0xDED32DED;
+    list->data[0].elem = POISON;
     list->data[0].next = 0;
     list->data[0].prev = 0;
     list->data[capacity].next = 0;
@@ -30,6 +32,7 @@ int ListCtor(struct List* list, size_t capacity)
     list->tail = 1;
     list->size = 0;
     list->capacity = capacity;
+    list->status = SORTED;
 
     LISTCHECK
 
@@ -43,50 +46,38 @@ int ListVerr(struct List* list)
     int errors = 0;
 
     if (list->free <= 0)
-        errors |= FreeErr;
+        errors |= FREEERR;
     if (list->data == NULL)
-        errors |= DataErr;
+        errors |= DATAERR;
     if (list->head < 0)
-        errors |= HeadErr;
+        errors |= HEADERR;
     if (list->size < 0 || list->size > list->capacity)
-        errors |= SizeErr;
+        errors |= SIZEERR;
     if (list->tail < 0)
-        errors |= TailErr;
+        errors |= TAILERR;
 
     int index = list->head;
 
     if (list->size > 1)
     {
         if (list->data[list->head].prev != -1 || list->data[list->data[list->head].next].prev != list->head)
-        {
-            errors |= HeadErr;
-            return errors;
-        }
+            errors |= HEADERR;
 
         if (list->data[list->tail].next != -1 || list->data[list->data[list->tail].prev].next != list->tail)
-        {
-            errors |= TailErr;
-            return errors;
-        }
-
+            errors |= TAILERR;
         while (index != list->data[list->tail].prev)
         {
             index = list->data[index].next;
-
             if (list->data[list->data[index].next].prev != index || list->data[list->data[index].prev].next != index)
             {
-                errors |= ElemErr;
-                continue;
+                errors |= ELEMERR;
             }
         }
     }
-
     else if (list->size == 1)
     {
         if (list->data[list->head].prev != -1 || list->data[list->tail].next != -1)
-        {
-            errors |= ElemErr;
-        }
+            errors |= ELEMERR;
     }
 
     index = list->free;
@@ -94,7 +85,7 @@ int ListVerr(struct List* list)
     {
         if (list->data[index].next <= 0)
         {
-            errors |= FreeErr;
+            errors |= FREEERR;
             continue;
         }
 
@@ -124,6 +115,10 @@ int ListTextDump(struct List* list, int errors, int line, const char* func, cons
     fprintf(logs, "size = %d\n", list->size);
     fprintf(logs, "capacity = %d\n", list->capacity);
     fprintf(logs, "free = %d\n", list->free);
+    if (list->status == SORTED)
+        fprintf(logs, "status = SORTED\n");
+    else
+        fprintf(logs, "status = UNSORTED\n");
 
     fprintf(logs, "index:");
     for (int i = 1; i < list->capacity + 1; i++)
@@ -146,6 +141,43 @@ int ListTextDump(struct List* list, int errors, int line, const char* func, cons
     return NOERR;
 }
 
+int ListGraphDump(struct List* list)
+{
+    DBG assert(list != NULL);
+
+    FILE* pic = fopen("picture.dot", "w");
+
+    fprintf(pic, "digraph List {\n");
+    fprintf(pic, "\trankdir = TB\n");
+
+    for (int i = 0; i < list->capacity + 1; i++)
+    {
+        if (isnan(list->data[i].elem))
+            fprintf(pic, "\t\"box%d\" [shape = \"record\", style = \"filled\", fillcolor = \"yellow\", label = \"{index = %d|POISONED|{prev = %d|next = %d}}\"]\n", i, i, list->data[i].prev, list->data[i].next);
+        else
+            fprintf(pic, "\t\"box%d\" [shape = \"record\", style = \"filled\", fillcolor = \"green\", label = \"{index = %d|val = %.0lf|{prev = %d|next = %d}}\"]\n", i, i, list->data[i].elem, list->data[i].prev, list->data[i].next);
+    }
+
+    fprintf(pic, "\t{rank = same;");
+    for (int i = 0; i < list->capacity + 1; i++)
+        fprintf(pic, "box%d; ", i);
+    fprintf(pic, "}\n");
+
+    for (int i = 1; i < list->capacity + 1; i++)
+    {
+        if (list->data[i].next != -1 && list->data[i].next < list->capacity + 1)
+            fprintf(pic, "\t\"box%d\" -> \"box%d\";\n", i, list->data[i].next);
+        if (list->data[i].prev != -1)
+            fprintf(pic, "\t\"box%d\" -> \"box%d\";\n", i, list->data[i].prev);
+    }
+
+    fprintf(pic, "}");
+
+    fclose(pic);
+
+    return NOERR;
+}
+
 int TailInsert(struct List* list, elem_t val)
 {
     DBG assert(list != NULL);
@@ -164,8 +196,8 @@ int TailInsert(struct List* list, elem_t val)
     list->data[newtail].next = -1;
     list->tail = newtail;
 
-    LISTCHECK
     SIZECHECK
+    LISTCHECK
 
     return newtail;
 }
@@ -185,6 +217,7 @@ int HeadInsert(struct List* list, elem_t val)
     list->head = newhead;
 
     list->size++;
+    list->status = UNSORTED;
 
     SIZECHECK
     LISTCHECK
@@ -210,6 +243,7 @@ int InsertAfterIndex(struct List* list, elem_t val, int index)
     list->data[index].next = newelem;
 
     list->size++;
+    list->status = UNSORTED;
 
     SIZECHECK
     LISTCHECK
@@ -236,6 +270,7 @@ int InsertBeforeIndex(struct List* list, elem_t val, int index)
 
     list->free = newelem;
     list->size++;
+    list->status = UNSORTED;
 
     SIZECHECK
     LISTCHECK
@@ -243,13 +278,15 @@ int InsertBeforeIndex(struct List* list, elem_t val, int index)
     return newelem;
 }
 
-int ListEnlarge(struct List* list, int mode)
+int ListResize(struct List* list, int mode)
 {
     DBG assert(list != NULL);
-
-    list->capacity *= RESIZECOEFF;
-
-    printf("capacity = %d", list->capacity);
+    if (mode == ENLARGE)
+        list->capacity *= RESIZECOEFF;
+    else if (mode == SHRINK && list->status == SORTED && list->size * 2 < list->capacity)
+        list->capacity /= RESIZECOEFF;
+    else
+        return RESIZERR;
 
     struct ElemList* prev = list->data;
 
@@ -311,6 +348,7 @@ int DeleteElement(struct List* list, int index)
 
     list->free = index;
     list->size -= 1;
+    list->status = UNSORTED;
 
     LISTCHECK
 
@@ -332,6 +370,7 @@ int DeleteHead(struct List* list)
     list->free = oldhead;
     list->head = newhead;
     list->size -= 1;
+    list->status = UNSORTED;
 
     LISTCHECK
 
@@ -353,6 +392,7 @@ int DeleteTail(struct List* list)
     list->free = oldtail;
     list->tail = newtail;
     list->size -= 1;
+    list->status = UNSORTED;
 
     LISTCHECK
 
@@ -374,6 +414,7 @@ int DeleteLastElement(struct List* list)
 
     list->free = lastelem;
     list->size -= 1;
+    list->status = UNSORTED;
 
     LISTCHECK
 
@@ -434,6 +475,48 @@ int compare(const elem_t a, const elem_t b)
         return 1;
     if ((a-b) < EPSILON)
         return -1;
+
+    return NOERR;
+}
+
+int ListSortByLogicIndex(struct List* list)
+{
+    struct ElemList* newdata = (struct ElemList*) calloc(list->capacity + 1, sizeof(struct ElemList));
+
+    if (newdata == NULL)
+        return MEMERR;
+
+    newdata[0].elem = POISON;
+    newdata[0].next = 0;
+    newdata[0].prev = 0;
+
+    int index = list->head;
+    int counter = 1;
+
+    while (counter <= list->size)
+    {
+        newdata[counter].elem = list->data[index].elem;
+        newdata[counter].next = counter + 1;
+        newdata[counter].prev = counter - 1;
+
+        counter++;
+        index = list->data[index].next;
+    }
+
+    newdata[1].prev = -1;
+    newdata[counter - 1].next = -1;
+
+    free(list->data);
+    list->data = newdata;
+    list->tail = counter - 1;
+    list->head = 1;
+    list->free = counter;
+    list->status = SORTED;
+
+    FillWPoison(list, list->free, list->capacity + 1);
+
+    SIZECHECK
+    LISTCHECK
 
     return NOERR;
 }

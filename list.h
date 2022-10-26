@@ -5,6 +5,7 @@ typedef double elem_t;
 
 const double POISON = NAN;
 const double RESIZECOEFF = 2.0;
+const double SHRINKCOEFF = 0.375;
 const double EPSILON = 1e-10;
 
 #define DEBUG
@@ -25,11 +26,15 @@ struct ElemList
 struct List
 {
     struct ElemList* data;
+
     int head;
     int tail;
     int free;
+
     size_t size;
     size_t capacity;
+
+    bool status;
 };
 
 int ListCtor(struct List* list, size_t capacity);
@@ -42,7 +47,7 @@ int InsertAfterIndex(struct List* list, elem_t val, int index);
 
 int InsertBeforeIndex(struct List* list, elem_t val, int index);
 
-int ListEnlarge(struct List* list, int mode);
+int ListResize(struct List* list, int mode);
 
 int FillWPoison(struct List* list, int start, int end);
 
@@ -62,9 +67,13 @@ int FindElemByLogicIndex(struct List* list, int logicindex);
 
 int compare(const elem_t a, const elem_t b);
 
+int ListSortByLogicIndex(struct List* list);
+
 int ListVerr(struct List* list);
 
 int ListTextDump(struct List* list, int errors, int line, const char* func, const char* file);
+
+int ListGraphDump(struct List* list);
 
 int ListDetor(struct List* list);
 
@@ -76,18 +85,25 @@ enum SysErrors
 
 enum ListErrors
 {
-    ElemErr = 1 << 1,
-    TailErr = 1 << 2,
-    HeadErr = 1 << 3,
-    SizeErr = 1 << 4,
-    FreeErr = 1 << 5,
-    DataErr = 1 << 6,
+    ELEMERR     = 1 << 1,
+    TAILERR     = 1 << 2,
+    HEADERR     = 1 << 3,
+    SIZEERR     = 1 << 4,
+    FREEERR     = 1 << 5,
+    DATAERR     = 1 << 6,
+    RESIZERR    = 1 << 7,
 };
 
-enum RESIZEMODES
+enum ResizeModes
 {
-    ENLARGE = 1,
-    SHRINK = 2,
+    ENLARGE     = 1,
+    SHRINK      = 2,
+};
+
+enum ListStatuses
+{
+    UNSORTED    = 0,
+    SORTED      = 1,
 };
 
 #endif //LIST_H

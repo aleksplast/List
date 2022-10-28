@@ -34,7 +34,27 @@ int ListCtor(struct List* list, size_t capacity)
     list->capacity = capacity;
     list->status = SORTED;
 
+    list->graphlog = fopen("graphlog.htm", "w");
+    fclose(list->graphlog);
+
     LISTCHECK
+
+    return NOERR;
+}
+
+int FillWPoison(struct List* list, int start, int end)
+{
+    DBG assert(list != NULL);
+
+    int tempfree = list->size + 1;
+
+    for (int i = start; i < end; i++)
+    {
+        list->data[i].elem = POISON;
+        list->data[i].prev = -1;
+        list->data[i].next = tempfree + 1;
+        tempfree++;
+    }
 
     return NOERR;
 }
@@ -141,27 +161,40 @@ int ListTextDump(struct List* list, int errors, int line, const char* func, cons
     return NOERR;
 }
 
-int ListGraphDump(struct List* list)
+int ListGraphDump(struct List* list, char reason[], int line)
 {
     DBG assert(list != NULL);
 
-    FILE* pic = fopen("picture.dot", "w");
+    char picture[15] = "picture";
+    sprintf(picture, "%d.dot", Piccounter);
+    char picturesrc[15] = "picture";
+    sprintf(picturesrc, "%d.png", Piccounter);
 
-    fprintf(pic, "digraph List {\n");
+    FILE* pic = fopen(picture, "w");
+
+    fprintf(pic, "DiGraph List {\n");
     fprintf(pic, "\trankdir = TB\n");
 
     for (int i = 0; i < list->capacity + 1; i++)
     {
         if (isnan(list->data[i].elem))
-            fprintf(pic, "\t\"box%d\" [shape = \"record\", style = \"filled\", fillcolor = \"yellow\", label = \"{index = %d|POISONED|{prev = %d|next = %d}}\"]\n", i, i, list->data[i].prev, list->data[i].next);
+            fprintf(pic, "\t\"box%d\" [shape = \"record\", style = \"filled\", fillcolor = \"yellow\", label = \"{index = %d|PSN|prev = %d|next = %d}\"]\n", i, i, list->data[i].prev, list->data[i].next);
         else
-            fprintf(pic, "\t\"box%d\" [shape = \"record\", style = \"filled\", fillcolor = \"green\", label = \"{index = %d|val = %.0lf|{prev = %d|next = %d}}\"]\n", i, i, list->data[i].elem, list->data[i].prev, list->data[i].next);
+            fprintf(pic, "\t\"box%d\" [shape = \"record\", style = \"filled\", fillcolor = \"green\", label = \"{index = %d|val = %.0lf|prev = %d|next = %d}\"]\n", i, i, list->data[i].elem, list->data[i].prev, list->data[i].next);
     }
+    fprintf(pic, "\t\"Tail\" [shape = \"record\", style = \"filled\", fillcolor = \"cyan\", label = \"Tail\"]\n");
+    fprintf(pic, "\t\"Head\" [shape = \"record\", style = \"filled\", fillcolor = \"cyan\", label = \"Head\"]\n");
+    fprintf(pic, "\t\"Free\" [shape = \"record\", style = \"filled\", fillcolor = \"cyan\", label = \"Free\"]\n");
 
     fprintf(pic, "\t{rank = same;");
     for (int i = 0; i < list->capacity + 1; i++)
         fprintf(pic, "box%d; ", i);
     fprintf(pic, "}\n");
+
+    for (int i = 1; i < list->capacity; i++)
+    {
+        fprintf(pic, "\t\"box%d\" -> \"box%d\"[style = \"invis\"];\n", i, i + 1);
+    }
 
     for (int i = 1; i < list->capacity + 1; i++)
     {
@@ -171,9 +204,30 @@ int ListGraphDump(struct List* list)
             fprintf(pic, "\t\"box%d\" -> \"box%d\";\n", i, list->data[i].prev);
     }
 
+    fprintf(pic, "\t\"Tail\" -> \"box%d\";\n", list->tail);
+    fprintf(pic, "\t\"Head\" -> \"box%d\";\n", list->head);
+    fprintf(pic, "\t\"Free\" -> \"box%d\";\n", list->free);
+
     fprintf(pic, "}");
 
     fclose(pic);
+    Piccounter += 1;
+
+    char src[80] = "";
+    sprintf(src, "dot -Tpng %s -o %s", picture, picturesrc);
+
+    system(src);
+
+    list->graphlog = fopen("graphlog.htm", "a");
+
+    fprintf(list->graphlog, "<pre>\n");
+
+    fprintf(list->graphlog, "<h2>ListDump after %s on %d line</h2>\n", reason, line);
+    fprintf(list->graphlog, "<img src = \"%s\">\n", picturesrc);
+
+    fprintf(list->graphlog, "<hr>\n");
+
+    fclose(list->graphlog);
 
     return NOERR;
 }
@@ -229,8 +283,8 @@ int InsertAfterIndex(struct List* list, elem_t val, int index)
 {
     DBG assert(list != NULL);
 
-    if (index == list->tail)
-        return TailInsert(list, val);
+    if (list->size == 0)
+        return InsertFirstElem(list, val);
 
     int newelem = list->free;
     list->free = list->data[newelem].next;
@@ -241,6 +295,8 @@ int InsertAfterIndex(struct List* list, elem_t val, int index)
 
     list->data[list->data[index].next].prev = newelem;
     list->data[index].next = newelem;
+
+    list->tail = newelem;
 
     list->size++;
     list->status = UNSORTED;
@@ -255,8 +311,8 @@ int InsertBeforeIndex(struct List* list, elem_t val, int index)
 {
     DBG assert(list != NULL);
 
-    if (index == list->head)
-        return HeadInsert(list, val);
+    if (list->size == 0)
+        return InsertFirstElem(list, val);
 
     int newelem = list->free;
     list->free = list->data[newelem].next;
@@ -268,7 +324,8 @@ int InsertBeforeIndex(struct List* list, elem_t val, int index)
     list->data[list->data[index].prev].next = newelem;
     list->data[index].prev = newelem;
 
-    list->free = newelem;
+    list->head = newelem;
+
     list->size++;
     list->status = UNSORTED;
 
@@ -276,6 +333,21 @@ int InsertBeforeIndex(struct List* list, elem_t val, int index)
     LISTCHECK
 
     return newelem;
+}
+
+int InsertFirstElem(struct List* list, elem_t val)
+{
+    int firstelem = list->free;
+    list->free = list->data[firstelem].next;
+
+    list->data[firstelem].elem = val;
+    list->data[firstelem].next = firstelem;
+    list->data[firstelem].prev = firstelem;
+
+    list->size++;
+    list->status = UNSORTED;
+
+    return firstelem;
 }
 
 int ListResize(struct List* list, int mode)
@@ -305,42 +377,20 @@ int ListResize(struct List* list, int mode)
     return NOERR;
 }
 
-int FillWPoison(struct List* list, int start, int end)
-{
-    DBG assert(list != NULL);
-
-    int tempfree = list->size + 1;
-
-    for (int i = start; i < end; i++)
-    {
-        list->data[i].elem = POISON;
-        list->data[i].prev = -1;
-        list->data[i].next = tempfree + 1;
-        tempfree++;
-    }
-
-    return NOERR;
-}
-
 int DeleteElement(struct List* list, int index)
 {
     DBG assert(list != NULL);
 
-    if (list->head == list->tail)
-    {
+    if (list->size == 1)
         return DeleteLastElement(list);
-    }
-
-    else if (index == list->head)
-        return DeleteHead(list);
-
-    else if (index == list->tail)
-        return DeleteTail(list);
 
     list->data[index].elem = 0;
 
     list->data[list->data[index].next].prev = list->data[index].prev;
     list->data[list->data[index].prev].next = list->data[index].next;
+
+    list->head = list->data[index].prev;
+    list->tail = list->data[index].next;
 
     list->data[index].elem = POISON;
     list->data[index].next = list->free;
@@ -411,6 +461,7 @@ int DeleteLastElement(struct List* list)
     list->data[lastelem].elem = POISON;
 
     list->data[lastelem].next = list->free;
+    list->data[lastelem].prev = -1;
 
     list->free = lastelem;
     list->size -= 1;
@@ -452,16 +503,22 @@ int FindElemByLogicIndex(struct List* list, int logicindex)
 {
     DBG assert(list != NULL);
 
+    if (list->status == SORTED && logicindex <= list->size)
+        return logicindex;
+
+    else if (logicindex > list->size)
+        return SIZEERR;
+
+    int counter = 0;
     int index = list->head;
 
-    while (index != list->tail)
+    while (counter < logicindex)
     {
-        if (index == logicindex)
-            return index;
         index = list->data[index].next;
+        counter++;
     }
 
-    return -1;
+    return index;
 }
 
 int compare(const elem_t a, const elem_t b)
@@ -503,8 +560,8 @@ int ListSortByLogicIndex(struct List* list)
         index = list->data[index].next;
     }
 
-    newdata[1].prev = -1;
-    newdata[counter - 1].next = -1;
+    newdata[1].prev = counter - 1;
+    newdata[counter - 1].next = 1;
 
     free(list->data);
     list->data = newdata;

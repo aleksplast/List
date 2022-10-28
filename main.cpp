@@ -12,25 +12,25 @@ int main()
 
     ListCtor(&list, 20);
 
-    int pos1 = TailInsert(&list, 5);
+    int pos2 = InsertAfterIndex(&list, 40, list.head);
 
-    int pos2 = HeadInsert(&list, 10);
-
-    int pos3 = TailInsert(&list, 20);
-
-    ListGraphDump(&list);
-
-    int pos4 = InsertAfterIndex(&list, 40, pos2);
+    ListGraphDump(&list, "insert after index", __LINE__);
 
     int pos5 = InsertBeforeIndex(&list, 80, pos2);
 
+    ListGraphDump(&list, "insert before index", __LINE__);
+
     DeleteElement(&list, pos2);
+
+    ListGraphDump(&list, "deleting element", __LINE__);
 
     ListSortByLogicIndex(&list);
 
-    TailInsert(&list, 35);
+    ListGraphDump(&list, "sorting", __LINE__);
 
     ListExterminatus(&list);
+
+    ListGraphDump(&list, "exterminatus", __LINE__);
 
 //    printf("elem5 = %d\n", list.data[pos5]);
 

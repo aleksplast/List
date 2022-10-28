@@ -23,6 +23,12 @@ struct ElemList
     int prev;
 };
 
+enum ListStatus
+{
+    UNSORTED    = 0,
+    SORTED      = 1,
+};
+
 struct List
 {
     struct ElemList* data;
@@ -34,8 +40,11 @@ struct List
     size_t size;
     size_t capacity;
 
-    bool status;
+    FILE* graphlog;
+    enum ListStatus status;
 };
+
+static int Piccounter = 1;
 
 int ListCtor(struct List* list, size_t capacity);
 
@@ -46,6 +55,8 @@ int HeadInsert(struct List* list, elem_t val);
 int InsertAfterIndex(struct List* list, elem_t val, int index);
 
 int InsertBeforeIndex(struct List* list, elem_t val, int index);
+
+int InsertFirstElem(struct List* list, elem_t val);
 
 int ListResize(struct List* list, int mode);
 
@@ -73,7 +84,7 @@ int ListVerr(struct List* list);
 
 int ListTextDump(struct List* list, int errors, int line, const char* func, const char* file);
 
-int ListGraphDump(struct List* list);
+int ListGraphDump(struct List* list, char reason[], int line);
 
 int ListDetor(struct List* list);
 
@@ -98,12 +109,6 @@ enum ResizeModes
 {
     ENLARGE     = 1,
     SHRINK      = 2,
-};
-
-enum ListStatuses
-{
-    UNSORTED    = 0,
-    SORTED      = 1,
 };
 
 #endif //LIST_H

@@ -8,17 +8,33 @@ int main()
     FILE* logs = fopen("logs.txt", "w");
     fclose(logs);
 
+    char* graphlog = "graphlog.htm";
+
     struct List list = {};
 
-    ListCtor(&list, 20);
+    ListCtor(&list, 10, graphlog);
 
-    int pos2 = InsertAfterIndex(&list, 40, list.head);
+    int pos2 = InsertAfterIndex(&list, 40, 0);
+
+    printf("HERE");
 
     ListGraphDump(&list, "insert after index", __LINE__);
 
-    int pos5 = InsertBeforeIndex(&list, 80, pos2);
+    int pos3 = InsertBeforeIndex(&list, 80, pos2);
 
     ListGraphDump(&list, "insert before index", __LINE__);
+
+    int pos4 = InsertAfterIndex(&list, 35, pos3);
+
+    ListGraphDump(&list, "insert after index", __LINE__);
+
+    int pos5 = InsertBeforeIndex(&list, 25, pos4);
+
+    ListGraphDump(&list, "insert before index", __LINE__);
+
+    DeleteElement(&list, pos4);
+
+    ListGraphDump(&list, "deleting element", __LINE__);
 
     DeleteElement(&list, pos2);
 
@@ -32,15 +48,9 @@ int main()
 
     ListGraphDump(&list, "exterminatus", __LINE__);
 
-//    printf("elem5 = %d\n", list.data[pos5]);
+        InsertAfterIndex(&list, 30, 0);
 
-//    printf("elem1 = %d\n", list.data[pos2]);
-
-//    printf("elem2 = %d\n", list.data[pos1]);
-
-//    printf("elem3 = %d\n", list.data[pos4]);
-
-//    printf("elem4 = %d\n", list.data[pos3]);
+    ListGraphDump(&list, "insert after index", __LINE__);
 
     ListDetor(&list);
 

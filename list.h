@@ -8,6 +8,9 @@ const double RESIZECOEFF = 2.0;
 const double SHRINKCOEFF = 0.375;
 const double EPSILON = 1e-10;
 
+#define HEAD list->data[0].next
+#define TAIL list->data[0].prev
+
 #define DEBUG
 
 #ifndef DEBUG
@@ -33,20 +36,18 @@ struct List
 {
     struct ElemList* data;
 
-    int head;
-    int tail;
     int free;
 
     size_t size;
     size_t capacity;
 
-    FILE* graphlog;
+    char* graphlog;
     enum ListStatus status;
 };
 
 static int Piccounter = 1;
 
-int ListCtor(struct List* list, size_t capacity);
+int ListCtor(struct List* list, size_t capacity, char* graphlog);
 
 int TailInsert(struct List* list, elem_t val);
 
